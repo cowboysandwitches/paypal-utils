@@ -25,7 +25,7 @@ Deno.test("ServerUtils, integration test", async () => {
   assert(createRes.ok);
   assert(typeof createRes.data.id === "string", "No valid order id received");
 
-  const captureRes = await serverUtils.captureOrder({
+  const captureRes = await serverUtils.capturePaymentForOrder({
     orderId: createRes.data.id,
   });
   console.debug({ captureRes });

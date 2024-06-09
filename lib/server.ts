@@ -6,6 +6,9 @@ interface Link {
   method: string;
 }
 
+/**
+ * @see https://developer.paypal.com/api/rest/responses/
+ */
 interface FailureResponseData {
   name: string;
   details: {
@@ -14,9 +17,6 @@ interface FailureResponseData {
   }[];
   message: string;
   debug_id: string;
-  /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_capture!c=201&path=links&t=response
-   */
   links: Link[];
 }
 
@@ -25,6 +25,9 @@ type GenericResponse<SuccessResponse> =
   | { ok: false; data: FailureResponseData };
 
 export interface ServerUtilsOptions {
+  /**
+   * This option controls which PayPal base url to use.
+   */
   isSandbox: boolean;
   credentials: {
     clientId: string;
@@ -39,25 +42,25 @@ export enum ServerUtilsCreateOrderOptionsIntent {
 
 export interface ServerUtilsCreateOrderOptions {
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=intent&t=request
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=intent&t=request
    */
   intent: ServerUtilsCreateOrderOptionsIntent;
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units&t=request
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units&t=request
    */
   purchaseUnits: {
     /**
-     * https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units/amount&t=request
+     * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units/amount&t=request
      */
     amount: {
       /**
-       * https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units&t=request
+       * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units/amount/currency_code&t=request
        *
        * The three-character [ISO-4217 currency code](https://developer.paypal.com/api/rest/reference/currency-codes/) that identifies the currency.
        */
       currencyCode: string;
       /**
-       * https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units&t=request
+       * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!path=purchase_units/amount/value&t=request
        *
        * The value, which might be:
        * - An integer for currencies like JPY that are not typically fractional.
@@ -72,17 +75,17 @@ export interface ServerUtilsCreateOrderOptions {
 
 export interface ServerUtilsCreateOrderResponseData {
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=id&t=response
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=id&t=response
    *
    * The newly-created order id.
    */
   id: string;
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=links&t=response
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=links&t=response
    */
   status: string;
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=status&t=response
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create!c=200&path=status&t=response
    */
   links: Link[];
 }
@@ -91,16 +94,56 @@ export interface ServerUtilsCaptureOrderOptions {
   orderId: string;
 }
 
-export interface ServerUtilsCaptureOrderResponseData {
-  name: string;
-  details: {
-    issue: string;
-    description: string;
-  }[];
-  message: string;
-  debug_id: string;
+export enum ServerUtilsCaptureOrderResponseDataStatus {
   /**
-   * https://developer.paypal.com/docs/api/orders/v2/#orders_capture!c=201&path=links&t=response
+   * The order was created with the specified context.
+   */
+  Created = "CREATED",
+  /**
+   * The order was saved and persisted.
+   * The order status continues to be in progress until a capture is
+   * made with `final_capture = true` for all purchase units within the order.
+   */
+  Saved = "SAVED",
+  /**
+   * The customer approved the payment through the PayPal wallet
+   * or another form of guest or unbranded payment. For example, a card, bank account, or so on.
+   */
+  Approved = "APPROVED",
+  /**
+   * All purchase units in the order are voided.
+   */
+  Voided = "VOIDED",
+  /**
+   * The payment was authorized or the authorized payment was captured for the order.
+   */
+  Completed = "COMPLETED",
+  /**
+   * The order requires an action from the payer (e.g. 3DS authentication).
+   * Redirect the payer to the "rel":"payer-action" HATEOAS link returned as part
+   * of the response prior to authorizing or capturing the order.
+   * Some payment sources may not return a payer-action HATEOAS link (eg. MB WAY).
+   * For these payment sources the payer-action is managed by the scheme itself (eg. through SMS, email, in-app notification, etc).
+   */
+  PayerActionRequired = "PAYER_ACTION_REQUIRED",
+}
+
+/**
+ * Not fully implemented.
+ */
+export interface ServerUtilsCaptureOrderResponseData {
+  /**
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture!c=201&path=purchase_units/id&t=response
+   *
+   * The order id.
+   */
+  id: string;
+  /**
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture!c=201&path=status&t=response
+   */
+  status: ServerUtilsCaptureOrderResponseDataStatus;
+  /**
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture!c=201&path=links&t=response
    */
   links: Link[];
 }
@@ -115,7 +158,6 @@ export class ServerUtils {
   }
 
   /**
-   * Generate an OAuth 2.0 access token for authenticating with PayPal REST APIs.
    * @see https://developer.paypal.com/api/rest/authentication/
    */
   public async generateAccessToken() {
@@ -135,6 +177,14 @@ export class ServerUtils {
     return data.access_token;
   }
 
+  /**
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_create
+   *
+   * Creates an order. Merchants and partners can add Level 2 and 3 data to payments
+   * to reduce risk and payment processing costs.
+   * For more information about processing payments, see [checkout](https://developer.paypal.com/docs/checkout/advanced/processing/)
+   * or [multiparty checkout](https://developer.paypal.com/docs/multiparty/checkout/advanced/processing/).
+   */
   public async createOrder(
     options: ServerUtilsCreateOrderOptions
   ): Promise<GenericResponse<ServerUtilsCreateOrderResponseData>> {
@@ -173,7 +223,15 @@ export class ServerUtils {
     };
   }
 
-  public async captureOrder(
+  /**
+   * @see https://developer.paypal.com/docs/api/orders/v2/#orders_capture
+   *
+   * Captures payment for an order. To successfully capture payment for an order,
+   * the buyer must first approve the order or a valid payment_source must be provided in the request.
+   * A buyer can approve the order upon being redirected to the rel:approve URL
+   * that was returned in the HATEOAS links in the create order response.
+   */
+  public async capturePaymentForOrder(
     options: ServerUtilsCaptureOrderOptions
   ): Promise<GenericResponse<ServerUtilsCaptureOrderResponseData>> {
     const accessToken = await this.generateAccessToken();
