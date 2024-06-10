@@ -217,10 +217,15 @@ export class ServerUtils {
     });
     const data = await res.json();
 
-    return {
-      ok: res.ok,
-      data,
-    };
+    return res.ok
+      ? {
+          ok: true,
+          data: data as ServerUtilsCreateOrderResponseData,
+        }
+      : {
+          ok: false,
+          data: data as FailureResponseData,
+        };
   }
 
   /**
@@ -251,6 +256,14 @@ export class ServerUtils {
     });
     const data = await res.json();
 
-    return { ok: res.ok, data };
+    return res.ok
+      ? {
+          ok: true,
+          data: data as ServerUtilsCaptureOrderResponseData,
+        }
+      : {
+          ok: false,
+          data: data as FailureResponseData,
+        };
   }
 }
